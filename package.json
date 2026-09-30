@@ -1,0 +1,23 @@
+{
+  "name": "dynamic-token-management-system",
+  "version": "1.0.0",
+  "description": "Dynamic Waiting Time Estimation Token System (MERN Stack)",
+  "scripts": {
+    "start": "node backend/server.js",
+    "backend": "cd backend && npm start",
+    "frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "seed": "cd backend && npm run seed"
+  },
+  "keywords": [
+    "mern",
+    "queue-management",
+    "dynamic-waiting-time",
+    "token-system",
+    "socket-io",
+    "hospital-queue",
+    "bank-queue"
+  ],
+  "author": "Antigravity Engineering",
+  "license": "MIT"
+}
