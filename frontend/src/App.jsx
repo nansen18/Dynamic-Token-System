@@ -5,11 +5,32 @@ import TokenTracker from './components/TokenTracker';
 import LobbyDisplay from './components/LobbyDisplay';
 import OfficerTerminal from './components/OfficerTerminal';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
-import { api, socket } from './services/api';
+import StaffManagement from './components/StaffManagement';
+
+// Auth Pages
+import WelcomePortal from './components/auth/WelcomePortal';
+import CustomerLogin from './components/auth/CustomerLogin';
+import CustomerSignUp from './components/auth/CustomerSignUp';
+import StaffLogin from './components/auth/StaffLogin';
+import AdminLogin from './components/auth/AdminLogin';
+
+import { api, socket, authStorage } from './services/api';
 import { playLobbyChime, speakAnnouncement } from './utils/sound';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('kiosk');
+  // Authentication State
+  const [currentUser, setCurrentUser] = useState(() => authStorage.getUser());
+  const [authView, setAuthView] = useState(() => (authStorage.getUser() ? null : 'welcome'));
+
+  // Main UI State
+  const [activeTab, setActiveTab] = useState(() => {
+    const user = authStorage.getUser();
+    if (!user) return 'kiosk';
+    if (user.role === 'STAFF') return 'officer';
+    if (user.role === 'ADMIN') return 'analytics';
+    return 'kiosk';
+  });
+
   const [selectedDepartment, setSelectedDepartment] = useState('ALL');
   const [services, setServices] = useState([]);
   const [counters, setCounters] = useState([]);
@@ -19,6 +40,27 @@ export default function App() {
   const [isResetting, setIsResetting] = useState(false);
   const [trackedTokenNumber, setTrackedTokenNumber] = useState('');
   const [notificationBanner, setNotificationBanner] = useState(null);
+
+  // Validate session on mount
+  useEffect(() => {
+    async function verifySession() {
+      if (authStorage.getToken()) {
+        try {
+          const res = await api.getMe();
+          if (res.user) {
+            setCurrentUser(res.user);
+            authStorage.setUser(res.user);
+          }
+        } catch {
+          // Token expired or invalid
+          authStorage.clear();
+          setCurrentUser(null);
+          setAuthView('welcome');
+        }
+      }
+    }
+    verifySession();
+  }, []);
 
   // Fetch all system data
   const loadData = useCallback(async () => {
@@ -119,6 +161,36 @@ export default function App() {
     }, 4500);
   };
 
+  // Auth Actions & Redirects
+  const handleLoginSuccess = (user) => {
+    setCurrentUser(user);
+    setAuthView(null);
+
+    // Redirect to correct dashboard based on role
+    if (user.role === 'CUSTOMER') {
+      setActiveTab('kiosk');
+      showNotification(`🎉 Welcome back, ${user.name}! Customer booking dashboard ready.`, 'emerald');
+    } else if (user.role === 'STAFF') {
+      setActiveTab('officer');
+      showNotification(`👔 Officer terminal connected. Welcome, ${user.name}!`, 'amber');
+    } else if (user.role === 'ADMIN') {
+      setActiveTab('analytics');
+      showNotification(`🛡️ Administrator clearance verified. Welcome, ${user.name}!`, 'indigo');
+    }
+  };
+
+  const handleLogout = () => {
+    api.logout();
+    setCurrentUser(null);
+    setAuthView('welcome');
+    setActiveTab('kiosk');
+    showNotification('👋 You have successfully signed out.', 'indigo');
+  };
+
+  const handleOpenAuth = () => {
+    setAuthView('welcome');
+  };
+
   const handleResetData = async () => {
     setIsResetting(true);
     try {
@@ -134,6 +206,12 @@ export default function App() {
   const handleTrackToken = (tokenNum) => {
     setTrackedTokenNumber(tokenNum);
     setActiveTab('tracker');
+    setAuthView(null);
+  };
+
+  const handleOpenLobby = () => {
+    setAuthView(null);
+    setActiveTab('lobby');
   };
 
   const waitingCount = tokens.filter(t => t.status === 'WAITING').length;
@@ -143,13 +221,19 @@ export default function App() {
       {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => {
+          setActiveTab(tab);
+          setAuthView(null);
+        }}
         selectedDepartment={selectedDepartment}
         setSelectedDepartment={setSelectedDepartment}
         onResetData={handleResetData}
         isResetting={isResetting}
         socketConnected={socketConnected}
         waitingCount={waitingCount}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        onOpenAuth={handleOpenAuth}
       />
 
       {/* Floating Real-Time Event Banner */}
@@ -158,57 +242,118 @@ export default function App() {
           <div className={`px-4 py-3 rounded-2xl shadow-2xl border text-xs sm:text-sm font-semibold flex items-center gap-2 backdrop-blur-md ${
             notificationBanner.type === 'amber'
               ? 'bg-amber-950/90 text-amber-200 border-amber-500/50 shadow-amber-500/20'
+              : notificationBanner.type === 'emerald'
+              ? 'bg-emerald-950/90 text-emerald-200 border-emerald-500/50 shadow-emerald-500/20'
               : 'bg-indigo-950/90 text-indigo-200 border-indigo-500/50 shadow-indigo-500/20'
           }`}>
-            <span className="h-2 w-2 rounded-full bg-indigo-400 animate-ping" />
+            <span className={`h-2 w-2 rounded-full animate-ping ${
+              notificationBanner.type === 'amber' ? 'bg-amber-400' :
+              notificationBanner.type === 'emerald' ? 'bg-emerald-400' : 'bg-indigo-400'
+            }`} />
             <span>{notificationBanner.msg}</span>
           </div>
         </div>
       )}
 
-      {/* Main Tab Views */}
+      {/* Main Content Area */}
       <main className="flex-1 pb-16">
-        {activeTab === 'kiosk' && (
-          <KioskBooking
-            services={services}
-            tokens={tokens}
-            onTokenCreated={() => loadData()}
-            onTrackToken={handleTrackToken}
+        {/* Unauthenticated / Dedicated Auth Pages */}
+        {authView === 'welcome' && (
+          <WelcomePortal
+            onSelectView={(view) => setAuthView(view)}
+            onQuickTrack={() => {
+              setAuthView(null);
+              setActiveTab('tracker');
+            }}
+            onOpenLobby={handleOpenLobby}
           />
         )}
 
-        {activeTab === 'tracker' && (
-          <TokenTracker
-            initialTokenNumber={trackedTokenNumber}
-            tokens={tokens}
-            onRefresh={loadData}
+        {authView === 'customer-login' && (
+          <CustomerLogin
+            onLoginSuccess={handleLoginSuccess}
+            onSwitchToSignUp={() => setAuthView('customer-signup')}
+            onBackToWelcome={() => setAuthView('welcome')}
           />
         )}
 
-        {activeTab === 'lobby' && (
-          <LobbyDisplay
-            counters={counters}
-            tokens={tokens}
-            selectedDepartment={selectedDepartment}
+        {authView === 'customer-signup' && (
+          <CustomerSignUp
+            onSignUpSuccess={handleLoginSuccess}
+            onSwitchToLogin={() => setAuthView('customer-login')}
+            onBackToWelcome={() => setAuthView('welcome')}
           />
         )}
 
-        {activeTab === 'officer' && (
-          <OfficerTerminal
-            counters={counters}
-            tokens={tokens}
-            onActionComplete={loadData}
+        {authView === 'staff-login' && (
+          <StaffLogin
+            onLoginSuccess={handleLoginSuccess}
+            onBackToWelcome={() => setAuthView('welcome')}
           />
         )}
 
-        {activeTab === 'analytics' && (
-          <AnalyticsDashboard
-            stats={stats}
-            services={services}
-            counters={counters}
-            onRefresh={loadData}
-            onResetData={handleResetData}
+        {authView === 'admin-login' && (
+          <AdminLogin
+            onLoginSuccess={handleLoginSuccess}
+            onBackToWelcome={() => setAuthView('welcome')}
           />
+        )}
+
+        {/* Existing Application Views (When authView is null) */}
+        {!authView && (
+          <>
+            {activeTab === 'kiosk' && (
+              <KioskBooking
+                services={services}
+                tokens={tokens}
+                onTokenCreated={() => loadData()}
+                onTrackToken={handleTrackToken}
+                currentUser={currentUser}
+              />
+            )}
+
+            {activeTab === 'tracker' && (
+              <TokenTracker
+                initialTokenNumber={trackedTokenNumber}
+                tokens={tokens}
+                onRefresh={loadData}
+              />
+            )}
+
+            {activeTab === 'lobby' && (
+              <LobbyDisplay
+                counters={counters}
+                tokens={tokens}
+                selectedDepartment={selectedDepartment}
+              />
+            )}
+
+            {activeTab === 'officer' && (
+              <OfficerTerminal
+                counters={counters}
+                tokens={tokens}
+                onActionComplete={loadData}
+                currentUser={currentUser}
+              />
+            )}
+
+            {activeTab === 'analytics' && (
+              <AnalyticsDashboard
+                stats={stats}
+                services={services}
+                counters={counters}
+                onRefresh={loadData}
+                onResetData={handleResetData}
+              />
+            )}
+
+            {activeTab === 'staff' && (
+              <StaffManagement
+                counters={counters}
+                onClose={() => setActiveTab('analytics')}
+              />
+            )}
+          </>
         )}
       </main>
 
@@ -227,3 +372,4 @@ export default function App() {
     </div>
   );
 }
+

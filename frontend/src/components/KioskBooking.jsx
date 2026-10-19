@@ -20,15 +20,21 @@ export default function KioskBooking({
   services, 
   tokens, 
   onTokenCreated, 
-  onTrackToken 
+  onTrackToken,
+  currentUser
 }) {
   const [selectedServiceId, setSelectedServiceId] = useState('');
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerName, setCustomerName] = useState(currentUser?.name || '');
+  const [customerPhone, setCustomerPhone] = useState(currentUser?.phone || '');
   const [priority, setPriority] = useState('REGULAR');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdToken, setCreatedToken] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
+
+  React.useEffect(() => {
+    if (currentUser?.name && !customerName) setCustomerName(currentUser.name);
+    if (currentUser?.phone && !customerPhone) setCustomerPhone(currentUser.phone);
+  }, [currentUser]);
 
   // Auto select first service if not selected
   const activeService = services.find(s => s.id === selectedServiceId) || services[0];

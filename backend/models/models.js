@@ -84,9 +84,30 @@ const AnalyticsLogSchema = new mongoose.Schema({
   counterNumber: { type: String, default: '' }
 });
 
+// User Schema (Customer, Staff, Admin)
+const UserSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  name: { type: String, required: true, trim: true },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  password: { type: String, required: true },
+  role: { 
+    type: String, 
+    enum: ['CUSTOMER', 'STAFF', 'ADMIN'], 
+    default: 'CUSTOMER' 
+  },
+  phone: { type: String, default: '' },
+  department: { type: String, default: 'ALL' },
+  counterId: { type: String, default: '' },
+  counterNumber: { type: String, default: '' },
+  active: { type: Boolean, default: true },
+  lastLoginAt: { type: Date, default: null }
+}, { timestamps: true });
+
 module.exports = {
   ServiceSchema,
   CounterSchema,
   TokenSchema,
-  AnalyticsLogSchema
+  AnalyticsLogSchema,
+  UserSchema
 };
+

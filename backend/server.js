@@ -4,7 +4,8 @@ const express = require('express');
 const cors = require('cors');
 const { Server } = require('socket.io');
 
-const { connectDB, Services, getMemoryStore, setMemoryStore } = require('./database/store');
+const { connectDB, Services, Users, getMemoryStore, setMemoryStore } = require('./database/store');
+const bcrypt = require('bcryptjs');
 const { getSeedData } = require('./seed/seedData');
 const estimationEngine = require('./services/estimationEngine');
 
@@ -87,6 +88,44 @@ async function bootstrap() {
     setMemoryStore(seedData);
     await estimationEngine.recalculateSchedule();
     console.log('✅ [Database] Seed data loaded successfully.');
+  }
+
+  // Provision authorized initial Administrator if none exists
+  const adminCount = await Users.countDocuments({ role: 'ADMIN' });
+  if (adminCount === 0) {
+    console.log('🛡️ [Auth] No Administrator detected. Provisioning root admin account...');
+    const salt = await bcrypt.genSalt(10);
+    const adminPasswordHash = await bcrypt.hash('Admin@Nexus2025', salt);
+    await Users.create({
+      id: 'usr_admin_root',
+      name: 'Nexus Administrator',
+      email: 'admin@nexusqueue.io',
+      password: adminPasswordHash,
+      role: 'ADMIN',
+      department: 'ALL',
+      active: true
+    });
+    console.log('✅ [Auth] Root Admin created: admin@nexusqueue.io');
+  }
+
+  // Provision initial Staff Officer if none exists
+  const staffCount = await Users.countDocuments({ role: 'STAFF' });
+  if (staffCount === 0) {
+    console.log('👔 [Auth] Provisioning initial authorized Staff Officer account...');
+    const salt = await bcrypt.genSalt(10);
+    const staffPasswordHash = await bcrypt.hash('Staff@Nexus2025', salt);
+    await Users.create({
+      id: 'usr_staff_01',
+      name: 'Dr. Sarah Connor',
+      email: 'officer.smith@nexusqueue.io',
+      password: staffPasswordHash,
+      role: 'STAFF',
+      department: 'Hospital',
+      counterId: 'cnt_hosp_1',
+      counterNumber: 'Counter 1',
+      active: true
+    });
+    console.log('✅ [Auth] Initial Staff created: officer.smith@nexusqueue.io');
   }
 
   server.listen(PORT, () => {

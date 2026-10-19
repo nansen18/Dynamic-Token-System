@@ -20,7 +20,8 @@ import { playLobbyChime, speakAnnouncement } from '../utils/sound';
 export default function OfficerTerminal({ 
   counters = [], 
   tokens = [], 
-  onActionComplete 
+  onActionComplete,
+  currentUser
 }) {
   const [selectedCounterId, setSelectedCounterId] = useState('');
   const [serviceElapsedTime, setServiceElapsedTime] = useState(0);
@@ -29,7 +30,17 @@ export default function OfficerTerminal({
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState(null);
 
-  // Auto-select first counter
+  // Auto-select counter assigned to logged-in officer if available
+  useEffect(() => {
+    if (currentUser && counters.length > 0) {
+      if (currentUser.counterId) {
+        const match = counters.find(c => c.id === currentUser.counterId || c.counterNumber === currentUser.counterNumber);
+        if (match) setSelectedCounterId(match.id);
+      }
+    }
+  }, [currentUser, counters]);
+
+  // Auto-select first counter if none selected
   const activeCounter = counters.find(c => c.id === selectedCounterId) || counters[0];
   const currentCounterId = selectedCounterId || (activeCounter ? activeCounter.id : '');
 
