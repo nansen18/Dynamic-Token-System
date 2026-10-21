@@ -12,10 +12,10 @@ const estimationEngine = require('./services/estimationEngine');
 const app = express();
 const server = http.createServer(app);
 
-// Enable CORS for all frontends (dev & preview ports)
+// Enable CORS for frontend
 app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+  origin: ["http://localhost:5173", "https://dynamic-token-system.vercel.app"],
+  credentials: true
 }));
 
 app.use(express.json());
@@ -23,7 +23,8 @@ app.use(express.json());
 // Setup Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: ["http://localhost:5173", "https://dynamic-token-system.vercel.app"],
+    credentials: true,
     methods: ['GET', 'POST']
   }
 });
@@ -34,6 +35,11 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log(`🔌 [Socket.io] Client disconnected: ${socket.id}`);
   });
+});
+
+// Health check root
+app.get('/', (req, res) => {
+  res.json({ status: 'ok' });
 });
 
 // Setup API routes
@@ -128,11 +134,11 @@ async function bootstrap() {
     console.log('✅ [Auth] Initial Staff created: officer.smith@nexusqueue.io');
   }
 
-  server.listen(PORT, () => {
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`=======================================================`);
     console.log(`🚀 DYNAMIC TOKEN SYSTEM BACKEND RUNNING ON PORT ${PORT}`);
     console.log(`⚡ Dynamic Engine: Active (EWMA + Concurrency + Overdue Penalty)`);
-    console.log(`🌐 API Endpoint: http://localhost:${PORT}/api`);
+    console.log(`🌐 API Endpoint: http://0.0.0.0:${PORT}/api`);
     console.log(`📡 Socket.IO Real-time Gateway: Ready`);
     console.log(`=======================================================`);
   });

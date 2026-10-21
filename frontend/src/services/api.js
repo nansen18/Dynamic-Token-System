@@ -1,7 +1,8 @@
 import { io } from 'socket.io-client';
+import { API_URL } from '../config';
 
-const API_BASE = 'http://localhost:5000/api';
-const SOCKET_URL = 'http://localhost:5000';
+const API_BASE = `${API_URL.replace(/\/+$/, '')}/api`;
+const SOCKET_URL = API_URL;
 
 export const socket = io(SOCKET_URL, {
   reconnectionAttempts: 10,
